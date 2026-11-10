@@ -298,6 +298,28 @@ nav.tabs button.on{color:var(--acc);background:var(--glass-strong);box-shadow:va
 nav.tabs{gap:0;padding:5px}
 nav.tabs button{padding:7px 11px 6px;font-size:10.5px;min-width:62px}
 nav.tabs button svg{width:21px;height:21px}
+
+/* ---- conta Google ---- */
+.hright{display:flex;align-items:center;gap:8px}
+.acct{width:38px;height:38px;border-radius:50%;padding:2px;position:relative;background:var(--glass);border:1px solid var(--stroke);box-shadow:var(--hl),var(--drop)}
+.acct img,.acct span{width:100%;height:100%;border-radius:50%;display:grid;place-items:center;object-fit:cover;font-weight:600;font-size:15px;background:var(--acc);color:var(--acc-ink)}
+.acct::after{content:'';position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;border:2px solid var(--bg);background:var(--acc)}
+.acct[data-s="saving"]::after{background:#f0b429}
+.acct[data-s="err"]::after{background:var(--neg)}
+.logincard{display:flex;flex-direction:column;gap:12px}
+.logincard b{display:block;font-weight:600;font-size:15px}
+.logincard small{display:block;color:var(--mut);font-size:13px;line-height:1.45;margin-top:2px}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 16px;border-radius:99px;background:#fff;color:#1f1f1f;font-weight:600;font-size:14.5px;border:1px solid rgba(0,0,0,.08);box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.gbtn.wide{width:100%;margin:4px 0 8px}
+.acctrow{display:flex;align-items:center;gap:12px;padding:4px 2px 14px;border-bottom:1px solid var(--sep);margin-bottom:4px}
+.acctrow img{width:46px;height:46px;border-radius:50%;object-fit:cover}
+.acctrow .t{flex:1;min-width:0}
+.acctrow b{display:block;font-weight:600}
+.acctrow small{display:block;font-size:12.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis}
+.acctrow .st{color:var(--acc);margin-top:2px}
+.acctrow .st[data-s="saving"]{color:#c48a00}
+.acctrow .st[data-s="err"]{color:var(--neg)}
+.mbtn.ghost{background:var(--chip);color:var(--ink);border:1px solid var(--stroke);margin:0}
 </style>
 </head>
 <body>
@@ -305,9 +327,9 @@ nav.tabs button svg{width:21px;height:21px}
 <div class="wrap">
   <header>
     <div class="logo"><i><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 14h.01"/></svg></i>Meus Gastos</div>
-    <button class="icon-btn" id="gear" aria-label="Ajustes">
+    <div class="hright"><button class="acct" id="acct" hidden aria-label="Conta" data-s="ok"></button><button class="icon-btn" id="gear" aria-label="Ajustes">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-    </button>
+    </button></div>
   </header>
   <main id="app"></main>
 </div>
@@ -379,9 +401,10 @@ function load(){
   let s = null;
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch(e){}
   s = s && s.items ? s : {};
-  return { v:2, items:s.items || [], learned:s.learned || {}, income:s.income || 0, goals:s.goals || [], incomes:s.incomes || [] };
+  return { v:2, items:s.items || [], learned:s.learned || {}, income:s.income || 0, goals:s.goals || [], incomes:s.incomes || [], del:s.del || [] };
 }
-function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
+function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
+function save(){ saveLocal(); schedulePush(); }
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 
 const ui = { tab:'inicio', month: ym(today()), draft:'', pick:null, split:null, inst:null, q:'', cat:null, view:'mes', idraft:'', ipick:null };
@@ -631,6 +654,7 @@ function renderInicio(){
   const m = ym(today()), total = monthTotal(m);
   const recent = sortItems(S.items).slice(0, 8);
   $app.innerHTML = `
+  ${loginCard()}
   <div class="card hero">
     <div class="lbl">No mês de ${monthName(m)}</div>
     <div class="big">${money(total)}</div>
@@ -707,7 +731,7 @@ function addFromDraft(){
   ui.draft = ''; ui.pick = null; ui.split = null; ui.inst = null;
   render();
   document.getElementById('draft').focus();
-  toast(`${money(share(item))} em ${CAT[cat].name}`, () => { S.items = S.items.filter(i => i.id !== item.id); save(); render(); });
+  toast(`${money(share(item))} em ${CAT[cat].name}`, () => { S.items = S.items.filter(i => i.id !== item.id); kill(item.id); save(); render(); });
 }
 
 function monthNav(){
@@ -972,7 +996,7 @@ function addEntry(){
   S.incomes.push(x); save();
   ui.idraft = ''; ui.ipick = null; render();
   document.getElementById('idraft').focus();
-  toast(`+${money(x.amt)} em ${INT[type].name}`, () => { S.incomes = S.incomes.filter(y => y.id !== x.id); save(); render(); });
+  toast(`+${money(x.amt)} em ${INT[type].name}`, () => { S.incomes = S.incomes.filter(y => y.id !== x.id); kill(x.id); save(); render(); });
 }
 function openEntry(id){
   const x = S.incomes.find(y => y.id === id); if (!x) return;
@@ -994,15 +1018,15 @@ function openEntry(id){
     save(); closeSheet(); render(); toast('Entrada atualizada');
   };
   document.getElementById('nDel').onclick = () => {
-    const idx = S.incomes.indexOf(x); S.incomes.splice(idx, 1); save(); closeSheet(); render();
-    toast('Entrada apagada', () => { S.incomes.splice(idx, 0, x); save(); render(); });
+    const idx = S.incomes.indexOf(x); S.incomes.splice(idx, 1); kill(x.id); save(); closeSheet(); render();
+    toast('Entrada apagada', () => { S.incomes.splice(idx, 0, x); revive(x.id); save(); render(); });
   };
 }
 
 /* ---------- folhas (editar etc.) ---------- */
 const $scrim = document.getElementById('scrim'), $sheet = document.getElementById('sheet');
 function openSheet(html){ $sheet.innerHTML = '<div class="grab"></div>' + html; $scrim.classList.add('open'); }
-function closeSheet(){ $scrim.classList.remove('open'); }
+function closeSheet(){ $scrim.classList.remove('open'); if (fb.pending) { const st = fb.pending; fb.pending = null; S = mergeStates(st, S); saveLocal(); schedulePush(); render(); } }
 $scrim.addEventListener('click', e => { if (e.target === $scrim) closeSheet(); });
 
 function openEdit(id){
@@ -1060,8 +1084,8 @@ function openEdit(id){
   };
   document.getElementById('eDel').onclick = () => {
     const idx = S.items.indexOf(i);
-    S.items.splice(idx, 1); save(); closeSheet(); render();
-    toast('Gasto apagado', () => { S.items.splice(idx, 0, i); save(); render(); });
+    S.items.splice(idx, 1); kill(i.id); save(); closeSheet(); render();
+    toast('Gasto apagado', () => { S.items.splice(idx, 0, i); revive(i.id); save(); render(); });
   };
 }
 
@@ -1095,7 +1119,7 @@ function openGoal(id){
     save(); closeSheet(); ui.tab = 'objetivos'; render();
   };
   const d = document.getElementById('gDel');
-  if (d) d.onclick = () => { if (!confirm(`Apagar o objetivo "${g.name}"?`)) return; S.goals = S.goals.filter(x => x !== g); save(); closeSheet(); render(); };
+  if (d) d.onclick = () => { if (!confirm(`Apagar o objetivo "${g.name}"?`)) return; S.goals = S.goals.filter(x => x !== g); kill(g.id); save(); closeSheet(); render(); };
 }
 function openDeposit(id){
   const g = S.goals.find(x => x.id === id); if (!g) return;
@@ -1121,14 +1145,16 @@ function openSettings(){
   const t = getTheme();
   openSheet(`
     <h3>Ajustes</h3>
+    ${accountBlock()}
     <button class="opt" data-income><span>Ganho mensal previsto</span><small>${S.income ? money0(S.income) : 'adicionar'}</small></button>
     <div class="opt"><span>Tema</span><div class="seg" id="seg">${[['auto','Auto'],['light','Claro'],['dark','Escuro']].map(([k,l]) => `<button data-th="${k}" class="${t===k?'on':''}">${l}</button>`).join('')}</div></div>
     <button class="opt" id="exp"><span>Baixar backup</span><small>arquivo .json</small></button>
     <button class="opt" id="imp"><span>Restaurar backup</span><small>substitui os dados</small></button>
     <button class="opt" id="wipe" style="color:var(--neg)"><span>Apagar tudo</span></button>
-    <div class="hint">Nesta versão os dados ficam salvos só neste aparelho. Faça backup de vez em quando.</div>
+    ${fb.user ? '' : '<div class="hint">Sem login, os dados ficam só neste aparelho. Faça backup de vez em quando ou entre com Google.</div>'}
     <input type="file" id="file" accept="application/json,.json" hidden>
   `);
+  const so = document.getElementById('signout'); if (so) so.onclick = signOut;
   document.getElementById('seg').addEventListener('click', e => {
     const b = e.target.closest('[data-th]'); if (!b) return;
     try { localStorage.setItem('grana-theme', b.dataset.th); } catch(err){}
@@ -1147,13 +1173,161 @@ function openSettings(){
       const s = JSON.parse(await file.files[0].text());
       if (!s.items) throw 0;
       if (!confirm(`Restaurar ${s.items.length} gastos? Os dados atuais serão substituídos.`)) return;
-      S = { v:2, items:s.items, learned:s.learned || {}, income:s.income || 0, goals:s.goals || [], incomes:s.incomes || [] }; save(); closeSheet(); render();
+      S = { v:2, items:s.items, learned:s.learned || {}, income:s.income || 0, goals:s.goals || [], incomes:s.incomes || [], del:S.del || [] }; save(); closeSheet(); render();
     } catch(e){ alert('Arquivo inválido.'); }
   };
   document.getElementById('wipe').onclick = () => {
-    if (!confirm('Apagar todos os gastos e objetivos? Não dá para desfazer.')) return;
-    S = { v:2, items:[], learned:{}, income:0, goals:[], incomes:[] }; save(); closeSheet(); render();
+    if (!confirm(fb.user ? 'Apagar todos os gastos, entradas e objetivos, aqui e na nuvem? Não dá para desfazer.' : 'Apagar todos os gastos e objetivos? Não dá para desfazer.')) return;
+    const gone = [...S.items, ...S.incomes, ...S.goals].map(o => o.id); S = emptyState(); gone.forEach(kill); save(); closeSheet(); render();
   };
+}
+
+/* ---------- login com Google + nuvem (Firebase, mesmo projeto do KOVA) ---------- */
+// Esses valores não são senha: quem protege os dados são as regras do Firestore
+// (users/<uid>/... só a própria pessoa lê e escreve).
+const FB_CFG = {
+  apiKey: "AIzaSyBXpl9IlTrBzpkb83DtGYo1QNseuKeW5MQ",
+  authDomain: "victreina.firebaseapp.com",
+  projectId: "victreina",
+  storageBucket: "victreina.firebasestorage.app",
+  messagingSenderId: "821889110598",
+  appId: "1:821889110598:web:4778264fc0e5ee303e7047"
+};
+const fb = { ready:false, user:null, col:null, last:{}, unsub:null, timer:null, pending:null, status:'local' };
+const OWNER = 'grana-owner';
+const getOwner = () => { try { return localStorage.getItem(OWNER) || ''; } catch(e){ return ''; } };
+const setOwner = v => { try { localStorage.setItem(OWNER, v); } catch(e){} };
+const emptyState = () => ({ v:2, items:[], learned:{}, income:0, goals:[], incomes:[], del:[] });
+
+// texto estável (chaves em ordem) para comparar o que já foi enviado
+function stable(v){
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+  return JSON.stringify(v === undefined ? null : v);
+}
+// um documento por mês (gastos + entradas daquele mês) e um "meta" com o resto
+function docsFromState(st){
+  const d = { meta: { v:2, learned:st.learned || {}, income:st.income || 0, goals:st.goals || [], del:st.del || [] } };
+  const box = k => d[k] = d[k] || { items:[], incomes:[] };
+  for (const i of st.items) box('m-' + ym(i.date)).items.push(i);
+  for (const x of st.incomes) box('m-' + ym(x.date)).incomes.push(x);
+  return JSON.parse(JSON.stringify(d));
+}
+function stateFromDocs(docs){
+  const st = emptyState();
+  for (const [id, d] of Object.entries(docs)) {
+    if (id === 'meta') Object.assign(st, { learned:d.learned || {}, income:d.income || 0, goals:d.goals || [], del:d.del || [] });
+    else { st.items.push(...(d.items || [])); st.incomes.push(...(d.incomes || [])); }
+  }
+  return st;
+}
+// junta dois estados; em caso de conflito no mesmo item, vale o "b"
+function mergeStates(a, b){
+  const del = new Set([...(a.del || []), ...(b.del || [])]);
+  const un = (x = [], y = []) => { const m = new Map(); for (const o of x) m.set(o.id, o); for (const o of y) m.set(o.id, o); return [...m.values()].filter(o => !del.has(o.id)); };
+  return { v:2, items:un(a.items, b.items), incomes:un(a.incomes, b.incomes), goals:un(a.goals, b.goals),
+    learned:{ ...(a.learned || {}), ...(b.learned || {}) }, income:b.income || a.income || 0, del:[...del].slice(-500) };
+}
+function kill(id){ S.del = [...(S.del || []).filter(x => x !== id), id].slice(-500); }
+function revive(id){ S.del = (S.del || []).filter(x => x !== id); }
+
+function setSync(s){ fb.status = s; const el = document.getElementById('acct'); if (el) el.dataset.s = s; }
+function schedulePush(){ if (!fb.user) return; clearTimeout(fb.timer); setSync('saving'); fb.timer = setTimeout(push, 500); }
+async function push(){
+  if (!fb.user) return;
+  const docs = docsFromState(S), batch = fb.fs.batch(); let n = 0;
+  for (const [id, d] of Object.entries(docs)) { const j = stable(d); if (fb.last[id] !== j) { batch.set(fb.col.doc(id), d); fb.last[id] = j; n++; } }
+  for (const id of Object.keys(fb.last)) if (!docs[id]) { batch.delete(fb.col.doc(id)); delete fb.last[id]; n++; }
+  if (!n) { setSync('ok'); return; }
+  try { await batch.commit(); setSync('ok'); } catch(e) { setSync('err'); }
+}
+function applyRemote(st){
+  if (stable(st) === stable(S)) return;
+  if ($scrim.classList.contains('open')) { fb.pending = st; return; }
+  const a = document.activeElement, focusId = a && a.id, pos = a && a.selectionStart;
+  S = st; saveLocal(); render();
+  const el = focusId && document.getElementById(focusId);
+  if (el && el.focus) { el.focus(); try { el.setSelectionRange(pos, pos); } catch(e){} }
+}
+
+const loadScript = src => new Promise((ok, err) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = err; document.head.appendChild(s); });
+async function connectFirebase(){
+  if (!location.protocol.startsWith('http')) return;
+  try { for (const m of ['app','auth','firestore']) await loadScript(`https://www.gstatic.com/firebasejs/10.12.2/firebase-${m}-compat.js`); }
+  catch(e) { return; }
+  firebase.initializeApp(FB_CFG);
+  fb.fs = firebase.firestore();
+  try { await fb.fs.enablePersistence({ synchronizeTabs:true }); } catch(e){}
+  fb.auth = firebase.auth(); fb.ready = true;
+  fb.auth.getRedirectResult().catch(e => toast('Não deu para entrar com Google (' + e.code + ')'));
+  fb.auth.onAuthStateChanged(async u => {
+    if (u) {
+      fb.user = u; setSync('saving');
+      fb.col = fb.fs.collection('users').doc(u.uid).collection('gastos');
+      let snap = null;
+      try { snap = await fb.col.get(); } catch(e) { try { snap = await fb.col.get({ source:'cache' }); } catch(e2){} }
+      const docs = {}; if (snap) snap.forEach(d => docs[d.id] = d.data());
+      fb.last = Object.fromEntries(Object.entries(docs).map(([k,v]) => [k, stable(v)]));
+      // dados que estavam só neste aparelho entram na conta (a não ser que sejam de outra conta)
+      const owner = getOwner();
+      const local = owner && owner !== u.uid ? emptyState() : S;
+      S = mergeStates(local, stateFromDocs(docs));
+      setOwner(u.uid); saveLocal(); push();
+      if (fb.unsub) fb.unsub();
+      fb.unsub = fb.col.onSnapshot(sn => {
+        if (sn.metadata.hasPendingWrites) return;
+        const d2 = {}; sn.forEach(d => d2[d.id] = d.data());
+        fb.last = Object.fromEntries(Object.entries(d2).map(([k,v]) => [k, stable(v)]));
+        applyRemote(stateFromDocs(d2));
+      }, () => setSync('err'));
+    } else {
+      if (fb.unsub) fb.unsub(); fb.unsub = null;
+      fb.user = null; fb.col = null; fb.last = {}; setSync('local');
+    }
+    render(); paintAccount();
+  });
+  render(); paintAccount();
+}
+function signIn(){
+  if (!fb.ready) { toast('Sem conexão com o Google agora. Tente de novo com internet.'); return; }
+  const p = new firebase.auth.GoogleAuthProvider();
+  p.setCustomParameters({ prompt:'select_account' });
+  fb.auth.signInWithPopup(p).catch(e => {
+    if (['auth/popup-blocked','auth/operation-not-supported-in-this-environment','auth/cancelled-popup-request'].includes(e.code)) fb.auth.signInWithRedirect(p);
+    else if (e.code !== 'auth/popup-closed-by-user') toast('Não deu para entrar com Google (' + e.code + ')');
+  });
+}
+async function signOut(){
+  if (!confirm('Sair da conta? Seus dados continuam salvos na nuvem e voltam quando você entrar de novo.')) return;
+  clearTimeout(fb.timer); await push();
+  await fb.auth.signOut();
+  S = emptyState(); setOwner(''); saveLocal(); closeSheet(); render();
+}
+const GOOGLE_G = '<svg viewBox="0 0 48 48" width="20" height="20"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>';
+function loginCard(){
+  if (fb.user || !fb.ready) return '';
+  return `<div class="card logincard">
+    <div><b>Nunca perca seus dados</b><small>Entre com Google para salvar tudo na nuvem e usar em qualquer aparelho.</small></div>
+    <button class="gbtn" data-signin>${GOOGLE_G}Entrar com Google</button>
+  </div>`;
+}
+function paintAccount(){
+  const el = document.getElementById('acct'); if (!el) return;
+  if (fb.user) {
+    el.hidden = false; el.dataset.s = fb.status;
+    el.innerHTML = fb.user.photoURL ? `<img src="${esc(fb.user.photoURL)}" alt="" referrerpolicy="no-referrer">` : `<span>${esc((fb.user.displayName || fb.user.email || '?')[0].toUpperCase())}</span>`;
+  } else el.hidden = true;
+}
+function accountBlock(){
+  if (fb.user) {
+    const msg = { ok:'Tudo salvo na nuvem', saving:'Salvando...', err:'Sem internet: salvo no aparelho, sobe quando voltar', local:'' }[fb.status] || '';
+    return `<div class="acctrow">
+      ${fb.user.photoURL ? `<img src="${esc(fb.user.photoURL)}" alt="" referrerpolicy="no-referrer">` : ''}
+      <div class="t"><b>${esc(fb.user.displayName || 'Sua conta')}</b><small>${esc(fb.user.email || '')}</small><small class="st" data-s="${fb.status}">${msg}</small></div>
+      <button class="mbtn ghost" id="signout">Sair</button></div>`;
+  }
+  return `<div class="acctrow"><div class="t"><b>Seus dados estão só neste aparelho</b><small>Entre para salvar na nuvem e não perder nada.</small></div></div>
+    <button class="gbtn wide" data-signin>${GOOGLE_G}Entrar com Google</button>`;
 }
 
 /* ---------- toast ---------- */
@@ -1168,7 +1342,7 @@ $toast.querySelector('button').onclick = () => { if (tUndo) tUndo(); tUndo = nul
 
 /* ---------- cliques gerais ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-go],[data-edit],[data-mon],[data-catview],[data-clearcat],[data-view],[data-income],[data-paid],[data-newgoal],[data-editgoal],[data-deposit],[data-setmonth],[data-editin]');
+  const t = e.target.closest('[data-tab],[data-go],[data-edit],[data-mon],[data-catview],[data-clearcat],[data-view],[data-income],[data-paid],[data-newgoal],[data-editgoal],[data-deposit],[data-setmonth],[data-editin],[data-signin],#acct');
   if (!t) return;
   const d = t.dataset;
   if (d.tab || d.go) { ui.tab = d.tab || d.go; if (ui.tab !== 'historico') ui.cat = null; if (ui.month > ym(today()) && ui.tab !== 'panorama' && ui.tab !== 'objetivos') ui.month = ym(today()); render(); scrollTo(0,0); }
@@ -1184,9 +1358,12 @@ document.addEventListener('click', e => {
   else if (d.editgoal) openGoal(d.editgoal);
   else if (d.deposit) openDeposit(d.deposit);
   else if (d.editin) openEntry(d.editin);
+  else if ('signin' in d) signIn();
+  else if (t.id === 'acct') openSettings();
 });
 document.getElementById('gear').onclick = openSettings;
 
+connectFirebase();
 applyTheme(getTheme());
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme(getTheme()));
 render();

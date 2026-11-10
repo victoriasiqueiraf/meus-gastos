@@ -1,4 +1,4 @@
-const CACHE = 'gastos-v6';
+const CACHE = 'gastos-v7';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -9,6 +9,8 @@ self.addEventListener('activate', e => {
 // Resto (ícones etc.): cache primeiro.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Google/Firebase e outros sites: deixa passar direto
+  if (new URL(e.request.url).origin !== location.origin) return;
   if (e.request.mode === 'navigate') {
     e.respondWith(fetch(e.request.url, { cache: 'no-store' })
       .then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('./', copy)); return r; })
