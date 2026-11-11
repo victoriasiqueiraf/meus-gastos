@@ -85,6 +85,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .card{border-radius:26px;padding:18px;margin-bottom:14px}
 .hero{padding:22px 20px;background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 20%,transparent),transparent 65%),var(--glass)}
 .hero .lbl{color:var(--mut);font-size:14px}
+.herohead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.closechip{flex:none;font-size:12px;font-weight:600;padding:6px 10px;border-radius:999px;border:1px solid var(--sep);background:var(--glass);color:var(--txt,inherit)}
+.daygrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:6px 0 14px}
+.daygrid button{height:42px;border-radius:12px;border:1px solid var(--sep);background:var(--glass);font-weight:600}
+.daygrid button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .hero .big{font-size:44px;font-weight:600;letter-spacing:-.04em;margin:4px 0 6px;font-variant-numeric:tabular-nums}
 .hero .sub{font-size:13px;color:var(--mut);display:flex;gap:8px;flex-wrap:wrap}
 .hero .sub span{padding:5px 10px;border-radius:99px;background:var(--chip);border:1px solid var(--stroke)}
@@ -553,7 +558,8 @@ function avgSpend(cat){
   const cur = ym(today()), k = daysIn(cur) / dayIdx(today());
   return Math.round(S.items.filter(f).reduce((b,i) => b + (fixedish(i) ? charge(i,cur) : charge(i,cur) * k), 0));
 }
-const gotIn = m => S.incomes.reduce((a,x) => a + (ym(x.date) === m ? x.amt : 0), 0);
+// o que entrou conta no mês do calendário (salário do dia 5 de novembro é de novembro), mesmo com virada em outro dia
+const gotIn = m => S.incomes.reduce((a,x) => a + (x.date.slice(0,7) === m ? x.amt : 0), 0);
 // ganho do mês: o que entrou de fato; enquanto o mês não fechou, no mínimo o previsto
 function incomeFor(m){ const g = gotIn(m); return m < ym(today()) ? (g || S.income) : Math.max(g, S.income); }
 // ganho de referência para objetivos: o previsto, ou a média do que entrou nos últimos meses
@@ -667,7 +673,7 @@ function renderInicio(){
   $app.innerHTML = `
   ${loginCard()}
   <div class="card hero">
-    <div class="lbl">No mês de ${monthName(m)}${rangeTxt(m) ? `<span class="rng">${rangeTxt(m)}</span>` : ''}</div>
+    <div class="lbl herohead"><span>No mês de ${monthName(m)}${rangeTxt(m) ? `<span class="rng">${rangeTxt(m)}</span>` : ''}</span><button class="closechip" data-closepick>${closeDay() > 1 ? 'zera dia ' + closeDay() : 'zera dia 1'}</button></div>
     <div class="big">${money(total)}</div>
     ${incomeBlock(m)}
     <div class="sub">${compareLine(m)}</div>
@@ -954,7 +960,7 @@ function entryRow(x){
 }
 function renderEntradas(){
   const m = ui.month, isCur = m === ym(today());
-  const list = S.incomes.filter(x => ym(x.date) === m).sort((a,b) => b.date.localeCompare(a.date) || b.ts - a.ts);
+  const list = S.incomes.filter(x => x.date.slice(0,7) === m).sort((a,b) => b.date.localeCompare(a.date) || b.ts - a.ts);
   const got = gotIn(m), out = monthTotal(m), bal = got - out;
   const groups = {};
   for (const x of list) (groups[x.date] = groups[x.date] || []).push(x);
@@ -1152,6 +1158,18 @@ function applyTheme(t){
   const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
   document.querySelector('meta[name=theme-color]').content = dark ? '#05090a' : '#e8f0ed';
 }
+function openClose(){
+  openSheet(`
+    <h3>Em que dia o mês zera?</h3>
+    <div class="hint" style="margin:0 0 10px">Escolha o dia que a fatura do cartão fecha. Os gastos zeram nesse dia; o que entrou continua no mês normal.</div>
+    <div class="daygrid">${Array.from({length:28},(_,k)=>k+1).map(n => `<button data-day="${n}" class="${n===closeDay()?'on':''}">${n}</button>`).join('')}</div>
+    <div class="hint">Dia 1 = mês normal do calendário.</div>`);
+  document.querySelector('.daygrid').addEventListener('click', e => {
+    const b = e.target.closest('[data-day]'); if (!b) return;
+    S.close = Number(b.dataset.day); save(); ui.month = ym(today()); closeSheet(); render();
+  });
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-closepick]')) openClose(); });
 function openSettings(){
   const t = getTheme();
   openSheet(`
