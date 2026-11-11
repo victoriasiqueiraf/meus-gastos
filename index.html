@@ -184,6 +184,8 @@ nav.tabs button.on{color:var(--acc);background:var(--glass-strong);box-shadow:va
 .opt{display:flex;align-items:center;justify-content:space-between;width:100%;padding:14px 4px;border-top:1px solid var(--sep);font-size:15px;text-align:left}
 .opt:first-of-type{border-top:0}
 .opt small{color:var(--mut)}
+.opt select{background:var(--card,transparent);border:1px solid var(--sep);border-radius:10px;padding:6px 8px;color:inherit}
+.rng{display:block;font-size:12px;font-weight:500;color:var(--mut);margin-top:2px;letter-spacing:0;text-transform:none}
 .seg{display:flex;background:var(--chip);border:1px solid var(--stroke);border-radius:99px;padding:3px}
 .seg button{padding:6px 12px;border-radius:99px;font-size:13px}
 .seg button.on{background:var(--glass-strong);box-shadow:var(--hl),0 2px 6px rgba(0,0,0,.08)}
@@ -401,7 +403,7 @@ function load(){
   let s = null;
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch(e){}
   s = s && s.items ? s : {};
-  return { v:2, items:s.items || [], learned:s.learned || {}, income:s.income || 0, goals:s.goals || [], incomes:s.incomes || [], del:s.del || [] };
+  return { v:2, items:s.items || [], learned:s.learned || {}, income:s.income || 0, goals:s.goals || [], incomes:s.incomes || [], del:s.del || [], close:s.close || 1 };
 }
 function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
 function save(){ saveLocal(); schedulePush(); }
@@ -413,7 +415,16 @@ const ui = { tab:'inicio', month: ym(today()), draft:'', pick:null, split:null, 
 function pad(n){ return String(n).padStart(2,'0'); }
 function today(){ const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function addDays(s, n){ const d = new Date(s+'T12:00'); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function ym(s){ return s.slice(0,7); }
+// "mês" do app: começa no dia de virada (S.close, ex.: dia que a fatura fecha). Com virada no dia 9,
+// "novembro" vai de 9/nov a 8/dez. Com dia 1 é o mês normal do calendário.
+function closeDay(){ return Math.min(28, Math.max(1, Number(typeof S !== "undefined" && S && S.close) || 1)); }
+function ym(s){ const m = s.slice(0,7); return Number(s.slice(8,10)) < closeDay() ? addMonths(m,-1) : m; }
+const periodStart = m => `${m}-${pad(closeDay())}`;
+const periodEnd = m => addDays(`${addMonths(m,1)}-${pad(closeDay())}`, -1);
+// em que dia do "mês" a data cai (1 = dia da virada)
+const dayIdx = s => Math.round((new Date(s+'T12:00') - new Date(periodStart(ym(s))+'T12:00')) / 864e5) + 1;
+const shortDate = s => { const d = new Date(s+'T12:00'); return d.getDate() + '/' + d.toLocaleDateString('pt-BR',{month:'short'}).replace('.',''); };
+const rangeTxt = m => closeDay() > 1 ? `${shortDate(periodStart(m))} a ${shortDate(periodEnd(m))}` : '';
 function addMonths(m, n){ let [y,mo] = m.split('-').map(Number); mo += n; while(mo<1){mo+=12;y--} while(mo>12){mo-=12;y++} return `${y}-${pad(mo)}`; }
 function mdiff(a, b){ const [ay,am] = a.split('-').map(Number), [by,bm] = b.split('-').map(Number); return (by-ay)*12 + (bm-am); }
 function monthName(m, short){ const d = new Date(m+'-15T12:00'); return d.toLocaleDateString('pt-BR', short ? {month:'short'} : {month:'long'}).replace('.',''); }
@@ -527,7 +538,7 @@ const fixedish = i => i.inst > 1 || ['casa','assin','edu'].includes(i.cat) || sh
 // projeção do mês atual: à vista no ritmo de hoje + parcelas do mês
 function projection(m){
   if (m !== ym(today())) return monthTotal(m);
-  const d = Number(today().slice(8)), f = daysIn(m) / d;
+  const d = dayIdx(today()), f = daysIn(m) / d;
   return S.items.reduce((a,i) => a + (fixedish(i) ? charge(i,m) : Math.round(charge(i,m) * f)), 0);
 }
 // meses usados para médias: até 3 meses anteriores com gastos
@@ -539,7 +550,7 @@ function baseMonths(){
 function avgSpend(cat){
   const f = i => !cat || i.cat === cat, ms = baseMonths();
   if (ms.length) return Math.round(ms.reduce((a,m) => a + S.items.filter(f).reduce((b,i) => b + charge(i,m), 0), 0) / ms.length);
-  const cur = ym(today()), k = daysIn(cur) / Number(today().slice(8));
+  const cur = ym(today()), k = daysIn(cur) / dayIdx(today());
   return Math.round(S.items.filter(f).reduce((b,i) => b + (fixedish(i) ? charge(i,cur) : charge(i,cur) * k), 0));
 }
 const gotIn = m => S.incomes.reduce((a,x) => a + (ym(x.date) === m ? x.amt : 0), 0);
@@ -577,7 +588,7 @@ function tips(m){
     const pe = Math.round(ess / inc * 100), pd = Math.round(des / inc * 100);
     if (pd > 30) out.push(`Gastos com desejos (delivery, lazer, álcool, compras, beleza, assinaturas) estão em <b>${pd}% da sua renda</b>. A regra 50/30/20 sugere até 30%; baixar para isso libera ${money0(des - inc*.3)} por mês.`);
     else if (pe > 50) out.push(`O essencial (casa, mercado, transporte, saúde) já leva <b>${pe}% da renda</b>. Vale renegociar contas fixas, como plano de celular, internet ou seguro.`);
-    else if (!isCur || Number(today().slice(8)) > 20) out.push(`Você está dentro da regra 50/30/20: ${pe}% no essencial e ${pd}% em desejos. Tente separar 20% (${money0(inc*.2)}) logo que o dinheiro cair.`);
+    else if (!isCur || dayIdx(today()) > 20) out.push(`Você está dentro da regra 50/30/20: ${pe}% no essencial e ${pd}% em desejos. Tente separar 20% (${money0(inc*.2)}) logo que o dinheiro cair.`);
     const next = monthTotal(addMonths(ym(today()),1));
     const nextInst = S.items.reduce((a,i) => a + (i.inst > 1 ? charge(i, addMonths(ym(today()),1)) : 0), 0);
     if (nextInst && nextInst > inc * .2) out.push(`Você já tem <b>${money0(nextInst)}</b> de parcelas no mês que vem (${Math.round(nextInst/inc*100)}% da renda). Evite parcelar mais coisas até algumas terminarem.`);
@@ -628,8 +639,8 @@ function compareLine(m){
   if (!prev) return '';
   let cur = monthTotal(m), base = prev;
   if (m === ym(today())) {
-    const d = Number(today().slice(8));
-    const upTo = (mm) => S.items.reduce((a,i) => a + (i.inst > 1 ? charge(i,mm) : (Number(i.date.slice(8)) <= d ? charge(i,mm) : 0)), 0);
+    const d = dayIdx(today());
+    const upTo = (mm) => S.items.reduce((a,i) => a + (i.inst > 1 ? charge(i,mm) : (dayIdx(i.date) <= d ? charge(i,mm) : 0)), 0);
     base = upTo(prevM); cur = upTo(m);
     if (!base) return '';
   }
@@ -656,7 +667,7 @@ function renderInicio(){
   $app.innerHTML = `
   ${loginCard()}
   <div class="card hero">
-    <div class="lbl">No mês de ${monthName(m)}</div>
+    <div class="lbl">No mês de ${monthName(m)}${rangeTxt(m) ? `<span class="rng">${rangeTxt(m)}</span>` : ''}</div>
     <div class="big">${money(total)}</div>
     ${incomeBlock(m)}
     <div class="sub">${compareLine(m)}</div>
@@ -738,7 +749,7 @@ function monthNav(){
   const cur = ym(today());
   return `<div class="monthnav">
     <button data-mon="-1" aria-label="Mês anterior"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-    <b>${monthName(ui.month)}${ui.month.slice(0,4) !== cur.slice(0,4) ? ' ' + ui.month.slice(0,4) : ''}</b>
+    <b>${monthName(ui.month)}${ui.month.slice(0,4) !== cur.slice(0,4) ? ' ' + ui.month.slice(0,4) : ''}${rangeTxt(ui.month) ? `<small class="rng">${rangeTxt(ui.month)}</small>` : ''}</b>
     <button data-mon="1" ${ui.tab !== 'panorama' && ui.month >= cur ? 'disabled' : ''} aria-label="Próximo mês"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
   </div>`;
 }
@@ -747,7 +758,7 @@ function renderPanorama(){
   const m = ui.month, view = ui.view, total = monthTotal(m, view);
   const cats = byCat(m, view);
   const isCur = m === ym(today()), future = m > ym(today());
-  const days = isCur ? Number(today().slice(8)) : daysIn(m);
+  const days = isCur ? dayIdx(today()) : daysIn(m);
   const bought = S.items.filter(i => ym(i.date) === m);
   const biggest = bought.slice().sort((a,b) => share(b) - share(a))[0];
   const perDay = {};
@@ -1147,6 +1158,7 @@ function openSettings(){
     <h3>Ajustes</h3>
     ${accountBlock()}
     <button class="opt" data-income><span>Ganho mensal previsto</span><small>${S.income ? money0(S.income) : 'adicionar'}</small></button>
+    <div class="opt"><span>Dia que o mês vira<small style="display:block;font-size:12px">ex.: dia que a fatura do cartão fecha</small></span><select id="closeSel" aria-label="Dia que o mês vira">${Array.from({length:28},(_,k)=>k+1).map(n => `<option value="${n}" ${n===closeDay()?'selected':''}>${n===1?'dia 1 (normal)':'dia '+n}</option>`).join('')}</select></div>
     <div class="opt"><span>Tema</span><div class="seg" id="seg">${[['auto','Auto'],['light','Claro'],['dark','Escuro']].map(([k,l]) => `<button data-th="${k}" class="${t===k?'on':''}">${l}</button>`).join('')}</div></div>
     <button class="opt" id="exp"><span>Baixar backup</span><small>arquivo .json</small></button>
     <button class="opt" id="imp"><span>Restaurar backup</span><small>substitui os dados</small></button>
@@ -1155,6 +1167,7 @@ function openSettings(){
     <input type="file" id="file" accept="application/json,.json" hidden>
   `);
   const so = document.getElementById('signout'); if (so) so.onclick = signOut;
+  document.getElementById('closeSel').onchange = e => { S.close = Number(e.target.value); save(); ui.month = ym(today()); render(); };
   document.getElementById('seg').addEventListener('click', e => {
     const b = e.target.closest('[data-th]'); if (!b) return;
     try { localStorage.setItem('grana-theme', b.dataset.th); } catch(err){}
@@ -1173,7 +1186,7 @@ function openSettings(){
       const s = JSON.parse(await file.files[0].text());
       if (!s.items) throw 0;
       if (!confirm(`Restaurar ${s.items.length} gastos? Os dados atuais serão substituídos.`)) return;
-      S = { v:2, items:s.items, learned:s.learned || {}, income:s.income || 0, goals:s.goals || [], incomes:s.incomes || [], del:S.del || [] }; save(); closeSheet(); render();
+      S = { v:2, items:s.items, learned:s.learned || {}, income:s.income || 0, goals:s.goals || [], incomes:s.incomes || [], del:S.del || [], close:s.close || S.close || 1 }; save(); closeSheet(); render();
     } catch(e){ alert('Arquivo inválido.'); }
   };
   document.getElementById('wipe').onclick = () => {
@@ -1197,7 +1210,7 @@ const fb = { ready:false, user:null, col:null, last:{}, unsub:null, timer:null, 
 const OWNER = 'grana-owner';
 const getOwner = () => { try { return localStorage.getItem(OWNER) || ''; } catch(e){ return ''; } };
 const setOwner = v => { try { localStorage.setItem(OWNER, v); } catch(e){} };
-const emptyState = () => ({ v:2, items:[], learned:{}, income:0, goals:[], incomes:[], del:[] });
+const emptyState = () => ({ v:2, items:[], learned:{}, income:0, goals:[], incomes:[], del:[], close:1 });
 
 // texto estável (chaves em ordem) para comparar o que já foi enviado
 function stable(v){
@@ -1207,16 +1220,16 @@ function stable(v){
 }
 // um documento por mês (gastos + entradas daquele mês) e um "meta" com o resto
 function docsFromState(st){
-  const d = { meta: { v:2, learned:st.learned || {}, income:st.income || 0, goals:st.goals || [], del:st.del || [] } };
+  const d = { meta: { v:2, learned:st.learned || {}, income:st.income || 0, goals:st.goals || [], del:st.del || [], close:st.close || 1 } };
   const box = k => d[k] = d[k] || { items:[], incomes:[] };
-  for (const i of st.items) box('m-' + ym(i.date)).items.push(i);
-  for (const x of st.incomes) box('m-' + ym(x.date)).incomes.push(x);
+  for (const i of st.items) box('m-' + i.date.slice(0,7)).items.push(i);
+  for (const x of st.incomes) box('m-' + x.date.slice(0,7)).incomes.push(x);
   return JSON.parse(JSON.stringify(d));
 }
 function stateFromDocs(docs){
   const st = emptyState();
   for (const [id, d] of Object.entries(docs)) {
-    if (id === 'meta') Object.assign(st, { learned:d.learned || {}, income:d.income || 0, goals:d.goals || [], del:d.del || [] });
+    if (id === 'meta') Object.assign(st, { learned:d.learned || {}, income:d.income || 0, goals:d.goals || [], del:d.del || [], close:d.close || 1 });
     else { st.items.push(...(d.items || [])); st.incomes.push(...(d.incomes || [])); }
   }
   return st;
@@ -1226,7 +1239,7 @@ function mergeStates(a, b){
   const del = new Set([...(a.del || []), ...(b.del || [])]);
   const un = (x = [], y = []) => { const m = new Map(); for (const o of x) m.set(o.id, o); for (const o of y) m.set(o.id, o); return [...m.values()].filter(o => !del.has(o.id)); };
   return { v:2, items:un(a.items, b.items), incomes:un(a.incomes, b.incomes), goals:un(a.goals, b.goals),
-    learned:{ ...(a.learned || {}), ...(b.learned || {}) }, income:b.income || a.income || 0, del:[...del].slice(-500) };
+    learned:{ ...(a.learned || {}), ...(b.learned || {}) }, income:b.income || a.income || 0, del:[...del].slice(-500), close:(b.close > 1 ? b.close : a.close) || 1 };
 }
 function kill(id){ S.del = [...(S.del || []).filter(x => x !== id), id].slice(-500); }
 function revive(id){ S.del = (S.del || []).filter(x => x !== id); }
