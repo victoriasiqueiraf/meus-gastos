@@ -369,10 +369,10 @@ const CATS = [
   {id:'transp', name:'Transporte',  color:'#3d8bfd', kw:['uber','99','taxi','gasolina','combustivel','posto','onibus','metro','estacionamento','pedagio','passagem','corrida','oficina','lavagem','lava jato','ipva']},
   {id:'casa',   name:'Casa',        color:'#9b6bd6', kw:['aluguel','condominio','luz','energia','agua','gas','internet','faxina','diarista','iptu','moveis','reforma','conta de luz','conta de agua']},
   {id:'assin',  name:'Assinaturas', color:'#e2589a', kw:['netflix','spotify','celular','assinatura','icloud','prime','disney','hbo','max','youtube','chatgpt','claude','canva','adobe','globoplay','deezer','apple']},
-  {id:'saude',  name:'Saúde',       color:'#e5484d', kw:['farmacia','remedio','medico','consulta','exame','academia','dentista','terapia','psicologa','psicologo','plano de saude','suplemento','whey','creatina','personal','pilates']},
+  {id:'saude',  name:'Saúde',       color:'#e5484d', kw:['farmacia','remedio','medico','consulta','exame','academia','dentista','terapia','psicologa','psicologo','drogasil','drogaria','raia','pague menos','pmenos','plano de saude','suplemento','whey','creatina','personal','pilates']},
   {id:'alcool', name:'Álcool',      color:'#a3365f', kw:['cerveja','cervejas','breja','chopp','chope','vinho','vinhos','drink','drinks','gin','vodka','whisky','uisque','cachaca','caipirinha','caipiroska','tequila','rum','licor','espumante','champagne','prosecco','bebida','bebidas','destilado','long neck','heineken','skol','brahma','budweiser','stella','amstel','corona','original','spaten','beats','ice','sake','aperol','negroni','dose','doses']},
   {id:'lazer',  name:'Lazer',       color:'#e0a800', kw:['cinema','show','bar','festa','viagem','hotel','ingresso','balada','praia','passeio','airbnb','jogo','role']},
-  {id:'compras',name:'Compras',     color:'#14b8a6', kw:['roupa','sapato','tenis','shopee','shein','amazon','presente','loja','mercado livre','mercadolivre','shopping','bolsa','vestido','biquini','renner','zara']},
+  {id:'compras',name:'Compras',     color:'#14b8a6', kw:['roupa','sapato','tenis','shopee','shein','amazon','presente','loja','mercado livre','mercadolivre','shopping','bolsa','vestido','biquini','renner','zara','magazine','magalu','americanas','riachuelo','cea','apple']},
   {id:'beleza', name:'Beleza',      color:'#c86fd0', kw:['salao','cabelo','unha','unhas','manicure','sobrancelha','maquiagem','make','skincare','depilacao','perfume','cilios','estetica','hidratacao']},
   {id:'edu',    name:'Educação',    color:'#6b7cff', kw:['curso','livro','faculdade','escola','mensalidade','aula','ingles','material','workshop']},
   {id:'pet',    name:'Pet',         color:'#b7834f', kw:['racao','veterinario','vet','petshop','pet shop','banho e tosa','pet']},
@@ -1578,10 +1578,69 @@ document.addEventListener('click', e => {
 });
 document.getElementById('gear').onclick = openSettings;
 
+/* ---------- SMS do banco (via Atalhos: abre ?sms=<texto do SMS>) ---------- */
+function hashTxt(s){ let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+function parseSMS(raw){
+  const txt = String(raw || '').replace(/\s+/g,' ').trim(), n = norm(txt);
+  if (!txt) return null;
+  // não é gasto: estorno, recusa, código, crédito recebido, aviso de fatura
+  if (/estorn|cancelad|negad|recusad|nao autorizad|nao aprovad|codigo|token|senha|recebid|credito em conta|deposito|fatura (fechou|fechada|disponivel|vence)|limite disponivel/.test(n)) return { skip:true };
+  let m = txt.match(/(?:R\$|\$|valor(?: de)?:?)\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}|\d+\.\d{2})/i) || txt.match(/(\d{1,3}(?:\.\d{3})*,\d{2})/);
+  if (!m) return null;
+  const amt = parseMoney(m[1].includes(',') ? m[1] : m[1].replace('.',','));
+  if (!amt) return null;
+  // data dd/mm(/aa) — se não tiver, hoje
+  let date = today(), d;
+  if ((d = txt.match(/\b(\d{2})\/(\d{2})(?:\/(\d{2,4}))?\b/))) {
+    const t = today(); let y = d[3] ? (d[3].length === 2 ? '20' + d[3] : d[3]) : t.slice(0,4);
+    if (!d[3] && `${y}-${d[2]}` > t.slice(0,7)) y = String(+y - 1);
+    const cand = `${y}-${d[2]}-${d[1]}`;
+    if (+d[2] >= 1 && +d[2] <= 12 && +d[1] >= 1 && +d[1] <= 31 && cand <= addDays(t,1) && cand >= addDays(t,-40)) date = cand;
+  }
+  // descrição: o que sobra depois de tirar banco, valor, datas, cartão e palavras de aviso
+  const pix = /\bpix\b/.test(n);
+  let desc;
+  if (pix && (d = txt.match(/\bpara\s+([A-Za-zÀ-ú][A-Za-zÀ-ú .'&-]{1,40}?)(?=[,.;]|\s+(?:em|no|na|as|às|de|valor|R\$|CPF|chave)\b|$)/i))) desc = 'Pix ' + d[1];
+  else {
+    let s = ' ' + txt.replace(/^[^:]{2,25}:\s*/, '') + ' ';
+    s = s.replace(m[0], ' ')
+      .replace(/\b\d{2}\/\d{2}(?:\/\d{2,4})?\b/g, ' ')
+      .replace(/\b\d{1,2}[:h]\d{2}(?:min)?\b/gi, ' ')
+      .replace(/\bfinal\s*\d{4}\b/gi, ' ').replace(/\b\d{4}\b/g, ' ')
+      .replace(/\bem\s+\d+x\b|\b\d+x\b/gi, ' ')
+      .replace(/[*|]/g, ' ');
+    const drop = new Set(['compra','compras','aprovada','aprovado','aprovadas','realizada','realizado','efetuada','no','na','nos','seu','sua','cartao','cartoes','credito','debito','final','valor','de','do','da','em','as','a','o','para','pra','com','visa','master','mastercard','elo','amex','hipercard','personnalite','uniclass','platinum','gold','black','infinite','internacional','nacional','virtual','fisico','transacao','pagamento','pago','paga','realizou','voce','foi','e','r','rs','brl','loja','estabelecimento','local','parcela','parcelas','parcelado','vezes','dia','hora','horas','ate','saldo','disponivel','limite','ref']);
+    desc = s.split(/[\s,.;:()\-–]+/).filter(w => w && !drop.has(norm(w)) && !/^\d+$/.test(w) && !/^\$/.test(w)).slice(0,4).join(' ');
+  }
+  desc = (desc || '').trim().split(' ').filter((w, i, a) => a.findIndex(x => norm(x) === norm(w)) === i).join(' ');
+  if (desc && desc === desc.toUpperCase()) desc = desc.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+  let inst = 0;
+  if ((d = n.match(/\b(?:em\s+)?(\d{1,2})\s*(?:x|vezes|parcelas)\b/)) && +d[1] >= 2 && +d[1] <= 24) inst = +d[1];
+  let cat = guessCat(desc); if (inst && cat === 'assin') cat = 'compras';
+  return { amt, date, desc: desc || 'Compra no cartão', cat, inst, id: 'sms-' + hashTxt(n) };
+}
+function fromSMS(){
+  const q = new URLSearchParams(location.search);
+  if (!q.has('sms') && !q.has('add')) return;
+  const raw = q.get('sms') || q.get('add') || '';
+  history.replaceState(null, '', location.pathname);
+  ui.tab = 'inicio';
+  if (q.has('add')) { ui.draft = raw; render(); return; }
+  const p = parseSMS(raw);
+  if (!p) { ui.draft = raw.slice(0, 120); render(); toast('Não achei o valor nesse SMS, confere aí'); return; }
+  if (p.skip) { toast('SMS ignorado: não é um gasto'); return; }
+  if (S.items.some(i => i.id === p.id) || (S.del || []).includes(p.id)) { toast('Esse SMS já tinha sido lançado'); return; }
+  const item = { id:p.id, amt:p.amt, desc:p.desc, cat:p.cat, date:p.date, ts:Date.now(), src:'sms' };
+  if (p.inst) item.inst = p.inst;
+  S.items.push(item); save(); render();
+  toast(`${money(item.amt)} · ${item.desc} em ${CAT[item.cat].name}`, () => { S.items = S.items.filter(i => i.id !== item.id); kill(item.id); save(); render(); });
+}
+
 connectFirebase();
 applyTheme(getTheme());
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme(getTheme()));
 render();
+fromSMS();
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   const hadSW = !!navigator.serviceWorker.controller;
