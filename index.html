@@ -334,6 +334,8 @@ nav.tabs button svg{width:21px;height:21px}
 .acctrow .st[data-s="saving"]{color:#c48a00}
 .acctrow .st[data-s="err"]{color:var(--neg)}
 .mbtn.ghost{background:var(--chip);color:var(--ink);border:1px solid var(--stroke);margin:0}
+.usage-p{display:flex;align-items:center;gap:6px;text-align:left}
+.usage-p .why{font-size:11px;color:var(--acc);font-weight:600;padding:1px 7px;border-radius:99px;background:color-mix(in srgb,var(--acc) 14%,transparent)}
 </style>
 </head>
 <body>
@@ -595,11 +597,43 @@ const sortItems = arr => arr.slice().sort((a,b) => b.date.localeCompare(a.date) 
 const instOf = i => { const b = Math.floor(share(i)/i.inst); return b; };
 // gastos que não se repetem no ritmo do dia a dia (parcelas, contas da casa, assinaturas, compras grandes)
 const fixedish = i => i.inst > 1 || !!i.rec || ['casa','assin','edu'].includes(i.cat) || share(i) >= 30000;
-// projeção do mês atual: à vista no ritmo de hoje + parcelas do mês
+const periodLen = m => Math.round((new Date(periodEnd(m)+'T12:00') - new Date(periodStart(m)+'T12:00')) / 864e5) + 1;
+// ritmo do gasto do dia a dia (sem parcelas, contas fixas e compras grandes), em centavos por dia.
+// Mistura o ritmo deste mês com o dos meses anteriores: no começo do mês pesa mais o histórico,
+// porque um fim de semana caro no dia 2 não quer dizer que o mês todo vai ser assim.
+// Sem histórico, só arrisca depois de 7 dias.
+function dailyRate(m, f = () => true){
+  const d = dayIdx(today()), len = periodLen(m);
+  const varOf = mm => S.items.reduce((a,i) => a + (f(i) && !fixedish(i) ? charge(i,mm) : 0), 0);
+  const cur = varOf(m) / d, ms = baseMonths();
+  const hist = ms.length ? ms.reduce((a,mm) => a + varOf(mm) / periodLen(mm), 0) / ms.length : null;
+  if (hist === null) return { rate: d >= 7 ? cur : null, cur, hist, w: 1, d, left: len - d };
+  const w = d / len;
+  return { rate: w * cur + (1 - w) * hist, cur, hist, w, d, left: len - d };
+}
+// projeção do mês atual: o que já foi + dia a dia no ritmo acima até o fim + contas de todo mês que ainda vão cair
 function projection(m){
   if (m !== ym(today())) return monthTotal(m);
-  const d = dayIdx(today()), f = daysIn(m) / d;
-  return S.items.reduce((a,i) => a + (fixedish(i) || i.rec ? charge(i,m) : Math.round(charge(i,m) * f)), 0) + recPending(m);
+  const r = dailyRate(m);
+  if (r.rate === null) return null;
+  return monthTotal(m) + Math.round(r.rate * r.left) + recPending(m);
+}
+function openProjection(){
+  const m = ym(today()), r = dailyRate(m), done = monthTotal(m), pend = recPending(m), proj = projection(m), inc = incomeFor(m);
+  const ahead = r.rate === null ? 0 : Math.round(r.rate * r.left);
+  openSheet(`
+    <h3>Como a projeção é feita</h3>
+    <p class="sheetp">É uma estimativa de quanto o mês vai fechar se você continuar no seu ritmo. Ela não supõe que você gasta todo dia: o ritmo é uma média, contando os dias em que você não gastou nada.</p>
+    <div class="cut"><span class="nm">Já gasto até hoje<small>dia ${r.d} de ${r.d + r.left} do mês</small></span><b style="color:var(--ink)">${money0(done)}</b></div>
+    <div class="cut"><span class="nm">Dia a dia até o fim<small>${r.rate === null ? 'aparece depois de 7 dias de mês' : `${money0(r.rate)} por dia × ${r.left} dias`}</small></span><b style="color:var(--ink)">${r.rate === null ? '-' : '+' + money0(ahead)}</b></div>
+    ${pend ? `<div class="cut"><span class="nm">Contas de todo mês que ainda vão cair</span><b style="color:var(--ink)">+${money0(pend)}</b></div>` : ''}
+    <div class="cut"><span class="nm"><b>Projeção</b></span><b class="${proj !== null && inc && proj > inc ? 'up' : ''}" style="font-size:17px">${proj === null ? 'ainda não' : money0(proj)}</b></div>
+    <p class="sheetp" style="margin-top:12px">${r.hist === null
+      ? `Ainda não tem meses anteriores para comparar, então o ritmo vem só deste mês: ${money0(r.cur)} por dia em média. Quanto mais dias passam, mais certeira fica.`
+      : `O ritmo mistura este mês (${money0(r.cur)}/dia) com a sua média dos meses anteriores (${money0(r.hist)}/dia). Hoje pesa ${Math.round(r.w*100)}% este mês e ${100 - Math.round(r.w*100)}% o histórico; no fim do mês, vale quase só o que você gastou de verdade.`}
+      Aluguel, contas da casa, assinaturas, parcelas e compras de R$ 300 ou mais não entram no ritmo, porque não se repetem todo dia.</p>
+    <div class="btns"><button class="btn pri" id="pjOk">Entendi</button></div>`);
+  document.getElementById('pjOk').onclick = closeSheet;
 }
 // meses usados para médias: até 3 meses anteriores com gastos
 function baseMonths(){
@@ -610,8 +644,9 @@ function baseMonths(){
 function avgSpend(cat){
   const f = i => !cat || i.cat === cat, ms = baseMonths();
   if (ms.length) return Math.round(ms.reduce((a,m) => a + S.items.filter(f).reduce((b,i) => b + charge(i,m), 0), 0) / ms.length);
-  const cur = ym(today()), k = daysIn(cur) / dayIdx(today());
-  return Math.round(S.items.filter(f).reduce((b,i) => b + (fixedish(i) ? charge(i,cur) : charge(i,cur) * k), 0));
+  // sem meses anteriores: o deste mês até agora + o ritmo do dia a dia até o fim (se já der para estimar)
+  const cur = ym(today()), r = dailyRate(cur, f);
+  return Math.round(S.items.filter(f).reduce((b,i) => b + charge(i,cur), 0) + (r.rate === null ? 0 : r.rate * r.left));
 }
 // o que entrou conta no mês do calendário (salário do dia 5 de novembro é de novembro), mesmo com virada em outro dia
 const gotIn = m => S.incomes.reduce((a,x) => a + (x.date.slice(0,7) === m ? x.amt : 0), 0);
@@ -644,7 +679,7 @@ function tips(m){
   const isCur = m === ym(today());
   const proj = projection(m);
   if (inc) {
-    if (isCur && proj > inc) out.push(`No ritmo atual você fecha o mês em <b>${money0(proj)}</b>, ${money0(proj - inc)} acima do que ganha. Segure os gastos que dá para adiar até o mês que vem.`);
+    if (isCur && proj !== null && proj > inc) out.push(`No ritmo atual você fecha o mês em <b>${money0(proj)}</b>, ${money0(proj - inc)} acima do que ganha. Segure os gastos que dá para adiar até o mês que vem.`);
     const ess = ESSENC.reduce((a,c) => a + (cats[c]||0), 0), des = total - ess;
     const pe = Math.round(ess / inc * 100), pd = Math.round(des / inc * 100);
     if (pd > 30) out.push(`Gastos com desejos (delivery, lazer, álcool, compras, beleza, assinaturas) estão em <b>${pd}% da sua renda</b>. A regra 50/30/20 sugere até 30%; baixar para isso libera ${money0(des - inc*.3)} por mês.`);
@@ -718,9 +753,9 @@ function incomeBlock(m){
   const pct = total / inc * 100, proj = projection(m);
   const left = inc - total;
   return `<div class="usage-wrap">
-    <div class="usage ${pct > 100 ? 'over' : pct > 85 ? 'warn' : ''}"><div style="width:${Math.min(pct,100)}%"></div>${isCur && proj > total ? `<i style="left:${Math.min(proj/inc*100,100)}%"></i>` : ''}</div>
+    <div class="usage ${pct > 100 ? 'over' : pct > 85 ? 'warn' : ''}"><div style="width:${Math.min(pct,100)}%"></div>${isCur && proj !== null && proj > total ? `<i style="left:${Math.min(proj/inc*100,100)}%"></i>` : ''}</div>
     <div class="usage-l"><span>${Math.round(pct)}% de ${money0(inc)} ${real >= inc ? 'que entrou' : 'previsto'}</span><button data-income>${left >= 0 ? 'sobram <b>' + money0(left) + '</b>' : 'passou <b>' + money0(-left) + '</b>'}</button></div>
-    ${isCur && proj > total ? `<div class="usage-p">Projeção para o fim do mês: <b class="${proj > inc ? 'up' : ''}">${money0(proj)}</b></div>` : ''}
+    ${isCur ? `<button class="usage-p" data-proj>${proj === null ? 'Projeção do mês: aparece depois de 7 dias' : `Projeção para o fim do mês: <b class="${proj > inc ? 'up' : ''}">${money0(proj)}</b>`}<span class="why">como?</span></button>` : ''}
   </div>`;
 }
 
@@ -1521,7 +1556,7 @@ $toast.querySelector('button').onclick = () => { if (tUndo) tUndo(); tUndo = nul
 
 /* ---------- cliques gerais ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-go],[data-edit],[data-mon],[data-catview],[data-clearcat],[data-view],[data-income],[data-paid],[data-newgoal],[data-editgoal],[data-deposit],[data-setmonth],[data-editin],[data-signin],#acct');
+  const t = e.target.closest('[data-tab],[data-go],[data-edit],[data-mon],[data-catview],[data-clearcat],[data-view],[data-income],[data-paid],[data-newgoal],[data-editgoal],[data-deposit],[data-setmonth],[data-editin],[data-signin],#acct,[data-proj]');
   if (!t) return;
   const d = t.dataset;
   if (d.tab || d.go) { ui.tab = d.tab || d.go; if (ui.tab !== 'historico') ui.cat = null; if (ui.month > ym(today()) && ui.tab !== 'panorama' && ui.tab !== 'objetivos') ui.month = ym(today()); render(); scrollTo(0,0); }
@@ -1538,6 +1573,7 @@ document.addEventListener('click', e => {
   else if (d.deposit) openDeposit(d.deposit);
   else if (d.editin) openEntry(d.editin);
   else if ('signin' in d) signIn();
+  else if ('proj' in d) openProjection();
   else if (t.id === 'acct') openSettings();
 });
 document.getElementById('gear').onclick = openSettings;
